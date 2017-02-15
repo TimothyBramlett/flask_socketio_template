@@ -5,19 +5,22 @@ import logging
 import platform
 import os
 
+# Needed if you only want to start the thead once
 thread = None
 
+# For logging
 if platform.platform().startswith('Windows'):
     logging_file = os.path.dirname(os.path.realpath(__file__)) + r'\test.log'
-
 logging.basicConfig(filename=logging_file, level=logging.DEBUG)
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'secret!'
+# specifically sets eventlet rather than letting the library choose
 socketio = SocketIO(app, async_mode='eventlet')
 
+
 def background_thread():
-    """Example of how to send server generated events to clients."""
+    """Streams data to the client in real time using websockets"""
     count = 0
     while count < 100:
         socketio.sleep(1)
@@ -27,23 +30,21 @@ def background_thread():
                       count,
                       namespace='/counter')
 
-
+# This is a traditional flask route to deliver the client js code and web page
 @app.route('/', methods=['GET', 'POST']) # The acceptable HTTP methods for this
 def index():
     return render_template('index.html')
 
-
-
-
+# Websocket view that launches a background thread when client notifies the server
+# that it has connected
 @socketio.on('client_connected', namespace='/counter')
 def start_counter(message):
-
     thread = socketio.start_background_task(target=background_thread)
     emit('number_counter_msg', 'Thread Started...')
 
 
-
-# # old version
+## This is the same as the above but it does not create a new bg thread
+## if one already exists.  Keeping this around for now.
 # @socketio.on('client_connected', namespace='/counter')
 # def start_counter(message):
 #     global thread
@@ -53,8 +54,8 @@ def start_counter(message):
 #         print('Thread already started.')
 #     emit('number_counter_msg', 'Thread Started...')
 
-
-
+## This is the version I was using before but has the issue of emit() not sending
+## Any data until the loop is finished.
 # @socketio.on('client_connected', namespace='/counter')
 # def test_message(message):
 #     #emit('my response', {'data': message['data']})
@@ -69,18 +70,9 @@ def start_counter(message):
 #         x += 1
 
 
-# @socketio.on('my broadcast event', namespace='/test')
-# def test_message(message):
-#     emit('my response', {'data': message['data']}, broadcast=True)
-#
 @socketio.on('connect')
 def test_connect():
-    # emit('my response', {'data': 'Connected'})
     print('Server Detected Connection from Client.')
-#
-# @socketio.on('disconnect', namespace='/test')
-# def test_disconnect():
-#     print('Client disconnected')
 
 
 

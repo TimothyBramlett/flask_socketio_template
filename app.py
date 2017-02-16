@@ -19,7 +19,7 @@ app.config['SECRET_KEY'] = 'secret!'
 socketio = SocketIO(app, async_mode='eventlet')
 
 
-def background_thread():
+def background_thread(room_name):
     """Streams data to the client in real time using websockets"""
     count = 0
     while count < 100:
@@ -28,18 +28,19 @@ def background_thread():
         print(count)
         socketio.emit('number_counter_msg',
                       count,
-                      namespace='/counter')
+                      namespace='/counter', room=room_name)
 
 # This is a traditional flask route to deliver the client js code and web page
 @app.route('/', methods=['GET', 'POST']) # The acceptable HTTP methods for this
 def index():
-    return render_template('index.html')
+    return render_template('index.html', async_mode=socketio.async_mode)
 
 # Websocket view that launches a background thread when client notifies the server
 # that it has connected
 @socketio.on('client_connected', namespace='/counter')
 def start_counter(message):
-    thread = socketio.start_background_task(target=background_thread)
+    room_name = request.sid
+    thread = socketio.start_background_task(target=background_thread, room_name=room_name)
     emit('number_counter_msg', 'Thread Started...')
 
 
